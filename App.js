@@ -12,10 +12,13 @@ import {
   SafeAreaView,
   StatusBar,
   StyleSheet,
+  Switch,
   Text,
   View,
+  Alert,
 } from "react-native";
 import ConfettiCannon from "react-native-confetti-cannon";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
 
 import { LISTE_MOTS } from "./src/data/mots.js";
@@ -45,6 +48,8 @@ import {
 import { GameCell } from "./src/components/GameCell.jsx";
 import { CustomKeyboard } from "./src/components/CustomKeyboard.jsx";
 
+const HAPTICS_STORAGE_KEY = "teny-miafina-haptics";
+
 export default function App() {
   const [secretWord, setSecretWord] = useState(() => pickRandomWord());
   const [board, setBoard] = useState(() => createEmptyBoard(secretWord.length));
@@ -57,6 +62,10 @@ export default function App() {
 
   // Player statistics state
   const [stats, setStats] = useState(DEFAULT_STATS);
+
+  // Settings & Vibration states
+  const [isSettingsVisible, setIsSettingsVisible] = useState(false);
+  const [hapticsEnabled, setHapticsEnabled] = useState(true);
 
   // Animated Splash Screen States
   const [isSplashVisible, setIsSplashVisible] = useState(true);
@@ -77,13 +86,22 @@ export default function App() {
   const isInputDisabled = isGameOver || isRevealing || isSplashVisible;
   const canConfirm = board[currentRow]?.every(Boolean);
 
-  // Load player statistics on mount
+  // Load configuration and statistics on mount
   useEffect(() => {
-    async function loadStats() {
+    async function loadInitialData() {
       const storedStats = await getGameStats();
       setStats(storedStats);
+
+      try {
+        const storedHaptics = await AsyncStorage.getItem(HAPTICS_STORAGE_KEY);
+        if (storedHaptics !== null) {
+          setHapticsEnabled(JSON.parse(storedHaptics));
+        }
+      } catch (e) {
+        console.error("Error loading haptics config:", e);
+      }
     }
-    loadStats();
+    loadInitialData();
   }, []);
 
   // Animated Splash Screen sequence
@@ -115,6 +133,50 @@ export default function App() {
 
     return () => clearTimeout(timer);
   }, [textOpacity, zoomScale, splashOpacity]);
+
+  // Centralized Haptic Trigger helper
+  const triggerHaptic = useCallback((type) => {
+    if (!hapticsEnabled) return;
+
+    if (type === "light") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    } else if (type === "warning") {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+    } else if (type === "success") {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    }
+  }, [hapticsEnabled]);
+
+  // Toggle Haptics configuration
+  const toggleHaptics = useCallback(async (value) => {
+    setHapticsEnabled(value);
+    try {
+      await AsyncStorage.setItem(HAPTICS_STORAGE_KEY, JSON.stringify(value));
+    } catch (e) {
+      console.error("Error saving haptics config:", e);
+    }
+  }, []);
+
+  // Reset player statistics
+  const handleResetStats = useCallback(() => {
+    Alert.alert(
+      "Hamerina ny statistika",
+      "Tena te-hamerina ho 0 ny statistika rehetra ve ianao?",
+      [
+        { text: "Hanafoana", style: "cancel" },
+        {
+          text: "Eny, avereno",
+          style: "destructive",
+          onPress: async () => {
+            await saveGameStats(DEFAULT_STATS);
+            setStats(DEFAULT_STATS);
+            triggerHaptic("warning");
+            Alert.alert("Voaverina!", "Voaverina ho 0 ny statistika rehetra.");
+          },
+        },
+      ]
+    );
+  }, [triggerHaptic]);
 
   // Update statistics helper using storageHelper methods
   const updateStats = useCallback(async (isWon) => {
@@ -211,8 +273,8 @@ export default function App() {
   const addLetter = useCallback((letter) => {
     if (isInputDisabled) return;
 
-    // Premium light tactile feedback for key presses
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    // Premium light tactile feedback
+    triggerHaptic("light");
 
     // Clear dictionary or completion error messages when typing a new letter
     setMessage((prev) => {
@@ -232,13 +294,13 @@ export default function App() {
     });
 
     animateCellPop(currentRow, selectedCol);
-  }, [animateCellPop, currentRow, isInputDisabled, getNextAvailableCell, selectedCol]);
+  }, [animateCellPop, currentRow, isInputDisabled, getNextAvailableCell, selectedCol, triggerHaptic]);
 
   const removeLetter = useCallback(() => {
     if (isInputDisabled) return;
 
-    // Premium light tactile feedback for backspace press
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    // Premium light tactile feedback
+    triggerHaptic("light");
 
     // Clear dictionary or completion error messages when removing a letter
     setMessage((prev) => {
@@ -264,13 +326,13 @@ export default function App() {
 
       return nextBoard;
     });
-  }, [currentRow, isInputDisabled, selectedCol]);
+  }, [currentRow, isInputDisabled, selectedCol, triggerHaptic]);
 
   const selectCell = useCallback((colIndex) => {
     if (isInputDisabled) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    triggerHaptic("light");
     setSelectedCol(colIndex);
-  }, [isInputDisabled]);
+  }, [isInputDisabled, triggerHaptic]);
 
   const revealRow = useCallback(async (rowIndex, evaluatedRow) => {
     for (let colIndex = 0; colIndex < evaluatedRow.length; colIndex += 1) {
@@ -295,7 +357,7 @@ export default function App() {
     // Check if the current row has all letters filled
     if (!canConfirm) {
       setMessage(`Fenoy aloha ny litera ${secretWord.length}.`);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      triggerHaptic("warning");
       triggerRowShake(currentRow);
       return;
     }
@@ -305,7 +367,7 @@ export default function App() {
     // STRICT VALIDATION AGAINST THE DICTIONARY (Rakibolana)
     if (!LISTE_MOTS.includes(guess)) {
       setMessage("Tsy ao anatin'ny rakibolana");
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      triggerHaptic("warning");
       triggerRowShake(currentRow);
       return;
     }
@@ -322,8 +384,8 @@ export default function App() {
       setMessage("Tena tsara!");
       setIsRevealing(false);
 
-      // Premium success haptics feedback
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      // Premium success haptics
+      triggerHaptic("success");
       
       // Update persistent user statistics
       await updateStats(true);
@@ -335,8 +397,8 @@ export default function App() {
       setMessage("Tapitra ny andrana.");
       setIsRevealing(false);
 
-      // Premium error haptics feedback for defeat
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      // Premium warning haptics for defeat
+      triggerHaptic("warning");
 
       // Update persistent user statistics
       await updateStats(false);
@@ -347,7 +409,7 @@ export default function App() {
     setSelectedCol(0);
     setMessage("Andramo indray.");
     setIsRevealing(false);
-  }, [board, canConfirm, currentRow, isInputDisabled, revealRow, secretWord, updateStats, triggerRowShake]);
+  }, [board, canConfirm, currentRow, isInputDisabled, revealRow, secretWord, updateStats, triggerRowShake, triggerHaptic]);
 
   const modalTitle = gameStatus === "won" ? "Arahabaina!" : "Miala tsiny!";
   const modalMessage =
@@ -362,14 +424,24 @@ export default function App() {
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
 
       <View style={styles.container}>
+        {/* Header Section */}
         <View style={styles.headerBox}>
-          <Text style={styles.title}>Teny Miafina</Text>
-          <Text style={styles.subtitle}>MALAGASY WORDLE</Text>
+          <View style={styles.headerRow}>
+            <View style={styles.headerSpacer} />
+            <View style={styles.titleContainer}>
+              <Text style={styles.title}>Teny Miafina</Text>
+              <Text style={styles.subtitle}>MALAGASY WORDLE</Text>
+            </View>
+            <Pressable onPress={() => setIsSettingsVisible(true)} style={styles.settingsButton}>
+              <Text style={styles.settingsIcon}>⚙</Text>
+            </Pressable>
+          </View>
           <View style={styles.messageWrap}>
             <Text style={styles.message}>{message}</Text>
           </View>
         </View>
 
+        {/* Board Grid */}
         <View style={styles.gridBox}>
           <View style={[styles.board, { width: boardWidth }]}>
             {board.map((row, rowIndex) => (
@@ -405,6 +477,7 @@ export default function App() {
           </View>
         </View>
 
+        {/* Keyboard Input */}
         <View style={styles.keyboardBox}>
           <CustomKeyboard
             onLetterPress={addLetter}
@@ -423,6 +496,60 @@ export default function App() {
           <ConfettiCannon count={140} origin={{ x: SCREEN_WIDTH + 20, y: 30 }} explosionSpeed={200} fallSpeed={1200} fadeOut autoStart />
         </View>
       )}
+
+      {/* Settings Modal (Fikirana) */}
+      <Modal transparent visible={isSettingsVisible} animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.settingsCard}>
+            <View style={styles.settingsHeader}>
+              <Text style={styles.settingsTitle}>Paramètres / Fikirana</Text>
+              <Pressable onPress={() => setIsSettingsVisible(false)} style={styles.closeButton}>
+                <Text style={styles.closeButtonText}>✕</Text>
+              </Pressable>
+            </View>
+
+            {/* Switch Haptics */}
+            <View style={styles.settingRow}>
+              <View>
+                <Text style={styles.settingLabel}>Vibrations / Haptique</Text>
+                <Text style={styles.settingSublabel}>Tsindry sy vibrations amin'ny rantsan-tanana</Text>
+              </View>
+              <Switch
+                value={hapticsEnabled}
+                onValueChange={toggleHaptics}
+                trackColor={{ false: COLORS.border, true: COLORS.green }}
+                thumbColor={hapticsEnabled ? COLORS.text : COLORS.mutedText}
+              />
+            </View>
+
+            {/* Rules of the game */}
+            <Text style={styles.sectionTitle}>Ahoana ny filalaovana</Text>
+            <View style={styles.rulesContainer}>
+              <Text style={styles.ruleText}>• Tadiavo ny teny miafina amin'ny andrana 6.</Text>
+              <Text style={styles.ruleText}>• Ny andrana tsirairay dia tsy maintsy teny misy dikany.</Text>
+              <Text style={styles.ruleText}>• Rehefa manamarina ianao, dia hiova ny lokon'ireo litera :</Text>
+              
+              <View style={styles.ruleExplanationRow}>
+                <View style={[styles.miniIndicator, { backgroundColor: COLORS.green }]} />
+                <Text style={styles.ruleDetailText}>Litera marina amin'ny toerany (Maitso)</Text>
+              </View>
+              <View style={styles.ruleExplanationRow}>
+                <View style={[styles.miniIndicator, { backgroundColor: COLORS.yellow }]} />
+                <Text style={styles.ruleDetailText}>Litera misy fa tsy amin'ny toerany (Mavo)</Text>
+              </View>
+              <View style={styles.ruleExplanationRow}>
+                <View style={[styles.miniIndicator, { backgroundColor: COLORS.darkGray }]} />
+                <Text style={styles.ruleDetailText}>Tsy ao anatin'ny teny miafina ilay litera (Gris)</Text>
+              </View>
+            </View>
+
+            {/* Reset statistics button */}
+            <Pressable onPress={handleResetStats} style={styles.resetButton}>
+              <Text style={styles.resetButtonText}>Hamerina ny statistika rehetra</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
 
       {/* Persistent Statistics Modal */}
       <Modal transparent visible={isGameOver} animationType="fade">
@@ -500,6 +627,20 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingTop: 10,
   },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "between",
+    width: "100%",
+    paddingHorizontal: 20,
+  },
+  headerSpacer: {
+    width: 44,
+  },
+  titleContainer: {
+    alignItems: "center",
+    flex: 1,
+  },
   title: {
     color: COLORS.text,
     fontSize: 28,
@@ -511,6 +652,20 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 1,
     marginTop: 2,
+  },
+  settingsButton: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 22,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  settingsIcon: {
+    color: COLORS.text,
+    fontSize: 22,
   },
   gridBox: {
     flex: 45,
@@ -631,6 +786,114 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontSize: 14,
     fontWeight: "900",
+  },
+  /* Settings (Fikirana) Styles */
+  settingsCard: {
+    width: "88%",
+    maxWidth: 360,
+    backgroundColor: COLORS.surfaceRaised,
+    borderColor: COLORS.border,
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 24,
+  },
+  settingsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  settingsTitle: {
+    color: COLORS.text,
+    fontSize: 20,
+    fontWeight: "900",
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 16,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  closeButtonText: {
+    color: COLORS.text,
+    fontSize: 14,
+  },
+  settingRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  settingLabel: {
+    color: COLORS.text,
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  settingSublabel: {
+    color: COLORS.mutedText,
+    fontSize: 11,
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  sectionTitle: {
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  rulesContainer: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    gap: 8,
+  },
+  ruleText: {
+    color: COLORS.mutedText,
+    fontSize: 12,
+    fontWeight: "600",
+    lineHeight: 18,
+  },
+  ruleExplanationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 4,
+  },
+  miniIndicator: {
+    width: 14,
+    height: 14,
+    borderRadius: 3,
+  },
+  ruleDetailText: {
+    color: COLORS.text,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  resetButton: {
+    width: "100%",
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.danger,
+    marginTop: 24,
+  },
+  resetButtonText: {
+    color: COLORS.danger,
+    fontSize: 13,
+    fontWeight: "800",
   },
   /* Splash Screen Animated Styles */
   splashContainer: {
