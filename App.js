@@ -20,6 +20,7 @@ import {
 import ConfettiCannon from "react-native-confetti-cannon";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
+import { Ionicons } from "@expo/vector-icons";
 
 import { LISTE_MOTS } from "./src/data/mots.js";
 import {
@@ -433,7 +434,7 @@ export default function App() {
               <Text style={styles.subtitle}>MALAGASY WORDLE</Text>
             </View>
             <Pressable onPress={() => setIsSettingsVisible(true)} style={styles.settingsButton}>
-              <Text style={styles.settingsIcon}>⚙</Text>
+              <Ionicons name="settings-sharp" size={24} color="#FFFFFF" />
             </Pressable>
           </View>
           <View style={styles.messageWrap}>
@@ -502,9 +503,9 @@ export default function App() {
         <View style={styles.modalOverlay}>
           <View style={styles.settingsCard}>
             <View style={styles.settingsHeader}>
-              <Text style={styles.settingsTitle}>Paramètres / Fikirana</Text>
+              <Text style={styles.settingsTitle}>Fikirana</Text>
               <Pressable onPress={() => setIsSettingsVisible(false)} style={styles.closeButton}>
-                <Text style={styles.closeButtonText}>✕</Text>
+                <Ionicons name="close" size={26} color="#A9ABB2" />
               </Pressable>
             </View>
 
@@ -523,7 +524,7 @@ export default function App() {
             </View>
 
             {/* Rules of the game */}
-            <Text style={styles.sectionTitle}>Ahoana ny filalaovana</Text>
+            <Text style={styles.sectionTitle}>Fomba filalaovana</Text>
             <View style={styles.rulesContainer}>
               <Text style={styles.ruleText}>• Tadiavo ny teny miafina amin'ny andrana 6.</Text>
               <Text style={styles.ruleText}>• Ny andrana tsirairay dia tsy maintsy teny misy dikany.</Text>
@@ -531,20 +532,21 @@ export default function App() {
               
               <View style={styles.ruleExplanationRow}>
                 <View style={[styles.miniIndicator, { backgroundColor: COLORS.green }]} />
-                <Text style={styles.ruleDetailText}>Litera marina amin'ny toerany (Maitso)</Text>
+                <Text style={styles.ruleDetailText}>Toerana marina (Maitso / Manga)</Text>
               </View>
               <View style={styles.ruleExplanationRow}>
                 <View style={[styles.miniIndicator, { backgroundColor: COLORS.yellow }]} />
-                <Text style={styles.ruleDetailText}>Litera misy fa tsy amin'ny toerany (Mavo)</Text>
+                <Text style={styles.ruleDetailText}>Litera misy ihany (Mavo)</Text>
               </View>
               <View style={styles.ruleExplanationRow}>
                 <View style={[styles.miniIndicator, { backgroundColor: COLORS.darkGray }]} />
-                <Text style={styles.ruleDetailText}>Tsy ao anatin'ny teny miafina ilay litera (Gris)</Text>
+                <Text style={styles.ruleDetailText}>Tsy ao anatin'ny teny (Mainty)</Text>
               </View>
             </View>
 
             {/* Reset statistics button */}
             <Pressable onPress={handleResetStats} style={styles.resetButton}>
+              <Ionicons name="trash-outline" size={20} color="#F87171" style={{ marginRight: 8 }} />
               <Text style={styles.resetButtonText}>Hamerina ny statistika rehetra</Text>
             </Pressable>
           </View>
@@ -630,7 +632,7 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "between",
+    justifyContent: "space-between",
     width: "100%",
     paddingHorizontal: 20,
   },
@@ -662,10 +664,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.border,
-  },
-  settingsIcon: {
-    color: COLORS.text,
-    fontSize: 22,
   },
   gridBox: {
     flex: 45,
@@ -818,10 +816,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  closeButtonText: {
-    color: COLORS.text,
-    fontSize: 14,
-  },
   settingRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -880,6 +874,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   resetButton: {
+    flexDirection: "row",
     width: "100%",
     height: 44,
     alignItems: "center",
