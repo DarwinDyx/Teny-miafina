@@ -48,11 +48,16 @@ import {
 } from "./src/utils/storageHelpers.js";
 import { GameCell } from "./src/components/GameCell.jsx";
 import { CustomKeyboard } from "./src/components/CustomKeyboard.jsx";
+import MainMenu from "./src/components/MainMenu.jsx";
 
 const HAPTICS_STORAGE_KEY = "teny-miafina-haptics";
 
 export default function App() {
-  const [secretWord, setSecretWord] = useState(() => pickRandomWord());
+  // Navigation & Game Config
+  const [screen, setScreen] = useState("menu"); // "menu" or "game"
+  const [difficulty, setDifficulty] = useState("moyen"); // "facile", "moyen", "difficile"
+  const [secretWord, setSecretWord] = useState(() => pickRandomWord("moyen"));
+
   const [board, setBoard] = useState(() => createEmptyBoard(secretWord.length));
   const [statuses, setStatuses] = useState(() => createEmptyStatuses(secretWord.length));
   const [currentRow, setCurrentRow] = useState(0);
@@ -64,8 +69,9 @@ export default function App() {
   // Player statistics state
   const [stats, setStats] = useState(DEFAULT_STATS);
 
-  // Settings & Vibration states
+  // Modals Visibility
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
+  const [isStatsModalVisible, setIsStatsModalVisible] = useState(false);
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
 
   // Animated Splash Screen States
@@ -188,6 +194,7 @@ export default function App() {
     });
   }, []);
 
+  // Dynamic board width calculation according to word length
   const boardWidth = useMemo(() => {
     const horizontalPadding = 28;
     const maxBoardWidth = Math.min(SCREEN_WIDTH - horizontalPadding, 420);
@@ -218,8 +225,11 @@ export default function App() {
     return colorsByLetter;
   }, [board, statuses]);
 
-  const resetGame = useCallback(() => {
-    const nextWord = pickRandomWord();
+  // Launches the game with a selected difficulty
+  const startGame = useCallback((selectedDiff) => {
+    setDifficulty(selectedDiff);
+    const nextWord = pickRandomWord(selectedDiff);
+    
     popValuesRef.current = createAnimatedGrid(nextWord.length, 1);
     flipValuesRef.current = createAnimatedGrid(nextWord.length, 0);
     shakeValuesRef.current.forEach((val) => val.setValue(0));
@@ -232,7 +242,24 @@ export default function App() {
     setMessage("Tadiavo ny teny miafina.");
     setGameStatus("playing");
     setIsRevealing(false);
+    setScreen("game");
   }, []);
+
+  const resetGame = useCallback(() => {
+    const nextWord = pickRandomWord(difficulty);
+    popValuesRef.current = createAnimatedGrid(nextWord.length, 1);
+    flipValuesRef.current = createAnimatedGrid(nextWord.length, 0);
+    shakeValuesRef.current.forEach((val) => val.setValue(0));
+
+    setSecretWord(nextWord);
+    setBoard(createEmptyBoard(nextWord.length));
+    setStatuses(createEmptyStatuses(nextWord.length));
+    setCurrentRow(0);
+    setSelectedCol(0);
+    setMessage("Tadiavo ny teny miafina.");
+    setGameStatus("playing");
+    setIsRevealing(false);
+  }, [difficulty]);
 
   const animateCellPop = useCallback((rowIndex, colIndex) => {
     const popValue = popValuesRef.current[rowIndex]?.[colIndex];
@@ -420,78 +447,113 @@ export default function App() {
     ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) 
     : 0;
 
+  // Render Splash Screen directly on top if active
+  if (isSplashVisible) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
+        <Animated.View style={[styles.splashContainer, { opacity: splashOpacity }]}>
+          <Animated.View
+            style={[
+              styles.splashContent,
+              {
+                opacity: textOpacity,
+                transform: [{ scale: zoomScale }],
+              },
+            ]}
+          >
+            <Text style={styles.splashTitle}>Teny Miafina</Text>
+            <Text style={styles.splashSubtitle}>MALAGASY WORDLE</Text>
+          </Animated.View>
+        </Animated.View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
 
-      <View style={styles.container}>
-        {/* Header Section */}
-        <View style={styles.headerBox}>
-          <View style={styles.headerRow}>
-            <View style={styles.headerSpacer} />
-            <View style={styles.titleContainer}>
-              <Text style={styles.title}>Teny Miafina</Text>
-              <Text style={styles.subtitle}>MALAGASY WORDLE</Text>
+      {screen === "menu" ? (
+        <MainMenu
+          onSelectDifficulty={startGame}
+          onOpenStats={() => setIsStatsModalVisible(true)}
+        />
+      ) : (
+        // Game View
+        <View style={styles.container}>
+          {/* Header Section */}
+          <View style={styles.headerBox}>
+            <View style={styles.headerRow}>
+              <Pressable onPress={() => setScreen("menu")} style={styles.backButton}>
+                <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+              </Pressable>
+              
+              <View style={styles.titleContainer}>
+                <Text style={styles.title}>Teny Miafina</Text>
+                <Text style={styles.subtitle}>MALAGASY WORDLE ({difficulty.toUpperCase()})</Text>
+              </View>
+              
+              <Pressable onPress={() => setIsSettingsVisible(true)} style={styles.settingsButton}>
+                <Ionicons name="settings-sharp" size={24} color="#FFFFFF" />
+              </Pressable>
             </View>
-            <Pressable onPress={() => setIsSettingsVisible(true)} style={styles.settingsButton}>
-              <Ionicons name="settings-sharp" size={24} color="#FFFFFF" />
-            </Pressable>
+            <View style={styles.messageWrap}>
+              <Text style={styles.message}>{message}</Text>
+            </View>
           </View>
-          <View style={styles.messageWrap}>
-            <Text style={styles.message}>{message}</Text>
+
+          {/* Board Grid */}
+          <View style={styles.gridBox}>
+            <View style={[styles.board, { width: boardWidth }]}>
+              {board.map((row, rowIndex) => (
+                <Animated.View
+                  key={`row-${rowIndex}`}
+                  style={[
+                    styles.row,
+                    {
+                      transform: [
+                        { translateX: shakeValuesRef.current[rowIndex] },
+                      ],
+                    },
+                  ]}
+                >
+                  {row.map((letter, colIndex) => (
+                    <GameCell
+                      key={`cell-${rowIndex}-${colIndex}`}
+                      letter={letter}
+                      status={statuses[rowIndex][colIndex]}
+                      isSelected={
+                        rowIndex === currentRow &&
+                        colIndex === selectedCol &&
+                        !isInputDisabled
+                      }
+                      isTouchable={rowIndex === currentRow && !isInputDisabled}
+                      flipValue={flipValuesRef.current[rowIndex][colIndex]}
+                      popValue={popValuesRef.current[rowIndex][colIndex]}
+                      onPress={() => selectCell(colIndex)}
+                    />
+                  ))}
+                </Animated.View>
+              ))}
+            </View>
+          </View>
+
+          {/* Keyboard Input */}
+          <View style={styles.keyboardBox}>
+            <CustomKeyboard
+              onLetterPress={addLetter}
+              onBackspace={removeLetter}
+              onConfirm={confirmGuess}
+              keyboardColors={keyboardColors}
+              disabled={isInputDisabled}
+              canConfirm={canConfirm}
+            />
           </View>
         </View>
+      )}
 
-        {/* Board Grid */}
-        <View style={styles.gridBox}>
-          <View style={[styles.board, { width: boardWidth }]}>
-            {board.map((row, rowIndex) => (
-              <Animated.View
-                key={`row-${rowIndex}`}
-                style={[
-                  styles.row,
-                  {
-                    transform: [
-                      { translateX: shakeValuesRef.current[rowIndex] },
-                    ],
-                  },
-                ]}
-              >
-                {row.map((letter, colIndex) => (
-                  <GameCell
-                    key={`cell-${rowIndex}-${colIndex}`}
-                    letter={letter}
-                    status={statuses[rowIndex][colIndex]}
-                    isSelected={
-                      rowIndex === currentRow &&
-                      colIndex === selectedCol &&
-                      !isInputDisabled
-                    }
-                    isTouchable={rowIndex === currentRow && !isInputDisabled}
-                    flipValue={flipValuesRef.current[rowIndex][colIndex]}
-                    popValue={popValuesRef.current[rowIndex][colIndex]}
-                    onPress={() => selectCell(colIndex)}
-                  />
-                ))}
-              </Animated.View>
-            ))}
-          </View>
-        </View>
-
-        {/* Keyboard Input */}
-        <View style={styles.keyboardBox}>
-          <CustomKeyboard
-            onLetterPress={addLetter}
-            onBackspace={removeLetter}
-            onConfirm={confirmGuess}
-            keyboardColors={keyboardColors}
-            disabled={isInputDisabled}
-            canConfirm={canConfirm}
-          />
-        </View>
-      </View>
-
-      {gameStatus === "won" && (
+      {gameStatus === "won" && screen === "game" && (
         <View pointerEvents="none" style={StyleSheet.absoluteFill}>
           <ConfettiCannon count={140} origin={{ x: -20, y: 30 }} explosionSpeed={200} fallSpeed={1200} fadeOut autoStart />
           <ConfettiCannon count={140} origin={{ x: SCREEN_WIDTH + 20, y: 30 }} explosionSpeed={200} fallSpeed={1200} fadeOut autoStart />
@@ -553,18 +615,31 @@ export default function App() {
         </View>
       </Modal>
 
-      {/* Persistent Statistics Modal */}
-      <Modal transparent visible={isGameOver} animationType="fade">
+      {/* Persistent Statistics Modal (Shared for Game Over and Stats Button) */}
+      <Modal transparent visible={isGameOver || isStatsModalVisible} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={[styles.modalTitle, gameStatus === "lost" && styles.modalTitleLost]}>
-              {modalTitle}
-            </Text>
-            <Text style={styles.modalMessage}>{modalMessage}</Text>
-            <Text style={styles.secretRevealText}>Ny teny marina : {secretWord}</Text>
+            {/* Modal Header */}
+            <View style={styles.modalHeaderRow}>
+              <Text style={[styles.modalTitle, !isStatsModalVisible && gameStatus === "lost" && styles.modalTitleLost]}>
+                {isStatsModalVisible ? "Statistika" : modalTitle}
+              </Text>
+              {isStatsModalVisible && (
+                <Pressable onPress={() => setIsStatsModalVisible(false)} style={styles.modalCloseButton}>
+                  <Ionicons name="close" size={24} color="#A9ABB2" />
+                </Pressable>
+              )}
+            </View>
+            
+            {!isStatsModalVisible && (
+              <>
+                <Text style={styles.modalMessage}>{modalMessage}</Text>
+                <Text style={styles.secretRevealText}>Ny teny marina : {secretWord}</Text>
+              </>
+            )}
 
             {/* Statistics Dashboard */}
-            <Text style={styles.statsTitle}>Statistika</Text>
+            {isStatsModalVisible && <Text style={styles.statsTitle}>Statistika ankapobeny</Text>}
             <View style={styles.statsContainer}>
               <View style={styles.statBox}>
                 <Text style={styles.statValue}>{stats.gamesPlayed}</Text>
@@ -584,30 +659,18 @@ export default function App() {
               </View>
             </View>
 
-            <Pressable onPress={resetGame} style={styles.playAgainButton}>
-              <Text style={styles.playAgainText}>HILALAO INDRAY</Text>
-            </Pressable>
+            {!isStatsModalVisible ? (
+              <Pressable onPress={resetGame} style={styles.playAgainButton}>
+                <Text style={styles.playAgainText}>HILALAO INDRAY</Text>
+              </Pressable>
+            ) : (
+              <Pressable onPress={() => setIsStatsModalVisible(false)} style={styles.playAgainButton}>
+                <Text style={styles.playAgainText}>HIKATONA</Text>
+              </Pressable>
+            )}
           </View>
         </View>
       </Modal>
-
-      {/* Animated Splash Screen Overlay */}
-      {isSplashVisible && (
-        <Animated.View style={[styles.splashContainer, { opacity: splashOpacity }]}>
-          <Animated.View
-            style={[
-              styles.splashContent,
-              {
-                opacity: textOpacity,
-                transform: [{ scale: zoomScale }],
-              },
-            ]}
-          >
-            <Text style={styles.splashTitle}>Teny Miafina</Text>
-            <Text style={styles.splashSubtitle}>MALAGASY WORDLE</Text>
-          </Animated.View>
-        </Animated.View>
-      )}
     </SafeAreaView>
   );
 }
@@ -636,9 +699,6 @@ const styles = StyleSheet.create({
     width: "100%",
     paddingHorizontal: 20,
   },
-  headerSpacer: {
-    width: 44,
-  },
   titleContainer: {
     alignItems: "center",
     flex: 1,
@@ -654,6 +714,16 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 1,
     marginTop: 2,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 22,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   settingsButton: {
     width: 44,
@@ -713,11 +783,27 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 24,
   },
+  modalHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    width: "100%",
+    marginBottom: 10,
+  },
+  modalCloseButton: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 16,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
   modalTitle: {
     color: COLORS.text,
     fontSize: 26,
     fontWeight: "900",
-    marginBottom: 6,
   },
   modalTitleLost: {
     color: COLORS.danger,

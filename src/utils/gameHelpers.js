@@ -2,8 +2,21 @@ import { Animated, Easing } from "react-native";
 import { LISTE_MOTS } from "../data/mots.js";
 import { COLORS, MAX_ATTEMPTS } from "../constants/theme.js";
 
-export function pickRandomWord() {
-  return LISTE_MOTS[Math.floor(Math.random() * LISTE_MOTS.length)].toUpperCase();
+export function pickRandomWord(mode) {
+  let filtered = LISTE_MOTS;
+  if (mode === "facile") {
+    filtered = LISTE_MOTS.filter((w) => w.length === 4);
+  } else if (mode === "moyen") {
+    filtered = LISTE_MOTS.filter((w) => w.length === 5 || w.length === 6);
+  } else if (mode === "difficile") {
+    filtered = LISTE_MOTS.filter((w) => w.length >= 7);
+  }
+  
+  if (filtered.length === 0) {
+    filtered = LISTE_MOTS;
+  }
+  
+  return filtered[Math.floor(Math.random() * filtered.length)].toUpperCase();
 }
 
 export function createEmptyBoard(wordLength) {
