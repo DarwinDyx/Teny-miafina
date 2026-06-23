@@ -18,7 +18,7 @@ import {
 import ConfettiCannon from "react-native-confetti-cannon";
 import * as Haptics from "expo-haptics";
 
-import { LISTE_MOTS } from "./mots.js";
+import { LISTE_MOTS } from "./src/data/mots.js";
 import {
   COLORS,
   MAX_ATTEMPTS,

@@ -1,5 +1,5 @@
 import { Animated, Easing } from "react-native";
-import { LISTE_MOTS } from "../../mots.js";
+import { LISTE_MOTS } from "../data/mots.js";
 import { COLORS, MAX_ATTEMPTS } from "../constants/theme.js";
 
 export function pickRandomWord() {
