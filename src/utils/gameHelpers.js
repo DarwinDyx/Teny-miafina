@@ -2,13 +2,13 @@ import { Animated, Easing } from "react-native";
 import { LISTE_MOTS } from "../data/mots.js";
 import { COLORS, MAX_ATTEMPTS } from "../constants/theme.js";
 
-export function pickRandomWord(mode) {
+export function generateSecretWord(length) {
   let filtered = LISTE_MOTS;
-  if (mode === "facile") {
+  if (length === 4) {
     filtered = LISTE_MOTS.filter((w) => w.length === 4);
-  } else if (mode === "moyen") {
+  } else if (length === 5) {
     filtered = LISTE_MOTS.filter((w) => w.length === 5 || w.length === 6);
-  } else if (mode === "difficile") {
+  } else if (length === 7) {
     filtered = LISTE_MOTS.filter((w) => w.length >= 7);
   }
   
@@ -17,6 +17,14 @@ export function pickRandomWord(mode) {
   }
   
   return filtered[Math.floor(Math.random() * filtered.length)].toUpperCase();
+}
+
+export function pickRandomWord(mode) {
+  let length = 5;
+  if (mode === "facile") length = 4;
+  else if (mode === "moyen") length = 5;
+  else if (mode === "difficile") length = 7;
+  return generateSecretWord(length);
 }
 
 export function createEmptyBoard(wordLength) {

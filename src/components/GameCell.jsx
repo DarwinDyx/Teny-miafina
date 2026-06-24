@@ -11,11 +11,14 @@ export const GameCell = memo(function GameCell({
   flipValue,
   popValue,
   onPress,
+  secretWordLength = 5,
 }) {
   const rotateX = flipValue.interpolate({
     inputRange: [-90, 0, 90],
     outputRange: ["-90deg", "0deg", "90deg"],
   });
+
+  const fontSize = secretWordLength >= 7 ? 16 : secretWordLength >= 6 ? 20 : 24;
 
   return (
     <Pressable
@@ -35,7 +38,7 @@ export const GameCell = memo(function GameCell({
           isSelected && styles.selectedCell,
         ]}
       >
-        <Text style={styles.cellText}>{letter}</Text>
+        <Text style={[styles.cellText, { fontSize }]}>{letter}</Text>
       </Animated.View>
     </Pressable>
   );

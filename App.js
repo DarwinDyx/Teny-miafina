@@ -34,6 +34,7 @@ import {
 import {
   evaluateGuess,
   pickRandomWord,
+  generateSecretWord,
   createEmptyBoard,
   createEmptyStatuses,
   createAnimatedGrid,
@@ -54,9 +55,10 @@ const HAPTICS_STORAGE_KEY = "teny-miafina-haptics";
 
 export default function App() {
   // Navigation & Game Config
-  const [screen, setScreen] = useState("menu"); // "menu" or "game"
+  const [gameState, setGameState] = useState("HOME"); // "HOME", "PLAYING", "STATS"
+  const [wordLength, setWordLength] = useState(5); // 4, 5, or 7
   const [difficulty, setDifficulty] = useState("moyen"); // "facile", "moyen", "difficile"
-  const [secretWord, setSecretWord] = useState(() => pickRandomWord("moyen"));
+  const [secretWord, setSecretWord] = useState(() => generateSecretWord(5));
 
   const [board, setBoard] = useState(() => createEmptyBoard(secretWord.length));
   const [statuses, setStatuses] = useState(() => createEmptyStatuses(secretWord.length));
@@ -225,10 +227,23 @@ export default function App() {
     return colorsByLetter;
   }, [board, statuses]);
 
+  const getDifficultyLabel = useCallback((diff) => {
+    if (diff === "facile") return "TSOTRA";
+    if (diff === "moyen") return "ANTATANY";
+    if (diff === "difficile") return "SAROTRA";
+    return diff.toUpperCase();
+  }, []);
+
   // Launches the game with a selected difficulty
   const startGame = useCallback((selectedDiff) => {
     setDifficulty(selectedDiff);
-    const nextWord = pickRandomWord(selectedDiff);
+    let length = 5;
+    if (selectedDiff === "facile") length = 4;
+    else if (selectedDiff === "moyen") length = 5;
+    else if (selectedDiff === "difficile") length = 7;
+    
+    setWordLength(length);
+    const nextWord = generateSecretWord(length);
     
     popValuesRef.current = createAnimatedGrid(nextWord.length, 1);
     flipValuesRef.current = createAnimatedGrid(nextWord.length, 0);
@@ -242,11 +257,11 @@ export default function App() {
     setMessage("Tadiavo ny teny miafina.");
     setGameStatus("playing");
     setIsRevealing(false);
-    setScreen("game");
+    setGameState("PLAYING");
   }, []);
 
   const resetGame = useCallback(() => {
-    const nextWord = pickRandomWord(difficulty);
+    const nextWord = generateSecretWord(wordLength);
     popValuesRef.current = createAnimatedGrid(nextWord.length, 1);
     flipValuesRef.current = createAnimatedGrid(nextWord.length, 0);
     shakeValuesRef.current.forEach((val) => val.setValue(0));
@@ -259,7 +274,7 @@ export default function App() {
     setMessage("Tadiavo ny teny miafina.");
     setGameStatus("playing");
     setIsRevealing(false);
-  }, [difficulty]);
+  }, [wordLength]);
 
   const animateCellPop = useCallback((rowIndex, colIndex) => {
     const popValue = popValuesRef.current[rowIndex]?.[colIndex];
@@ -393,7 +408,7 @@ export default function App() {
     const guess = board[currentRow].join("").toUpperCase();
 
     // STRICT VALIDATION AGAINST THE DICTIONARY (Rakibolana)
-    if (!LISTE_MOTS.includes(guess)) {
+    if (!LISTE_MOTS.includes(guess.toLowerCase())) {
       setMessage("Tsy ao anatin'ny rakibolana");
       triggerHaptic("warning");
       triggerRowShake(currentRow);
@@ -474,10 +489,13 @@ export default function App() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
 
-      {screen === "menu" ? (
+      {gameState === "HOME" || gameState === "STATS" ? (
         <MainMenu
           onSelectDifficulty={startGame}
-          onOpenStats={() => setIsStatsModalVisible(true)}
+          onOpenStats={() => {
+            setIsStatsModalVisible(true);
+            setGameState("STATS");
+          }}
         />
       ) : (
         // Game View
@@ -485,7 +503,7 @@ export default function App() {
           {/* Header Section */}
           <View style={styles.headerBox}>
             <View style={styles.headerRow}>
-              <Pressable onPress={() => setScreen("menu")} style={styles.backButton}>
+              <Pressable onPress={() => setGameState("HOME")} style={styles.backButton}>
                 <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
               </Pressable>
               
@@ -518,7 +536,7 @@ export default function App() {
                     },
                   ]}
                 >
-                  {row.map((letter, colIndex) => (
+                    {row.map((letter, colIndex) => (
                     <GameCell
                       key={`cell-${rowIndex}-${colIndex}`}
                       letter={letter}
@@ -532,6 +550,7 @@ export default function App() {
                       flipValue={flipValuesRef.current[rowIndex][colIndex]}
                       popValue={popValuesRef.current[rowIndex][colIndex]}
                       onPress={() => selectCell(colIndex)}
+                      secretWordLength={secretWord.length}
                     />
                   ))}
                 </Animated.View>
@@ -553,7 +572,7 @@ export default function App() {
         </View>
       )}
 
-      {gameStatus === "won" && screen === "game" && (
+      {gameStatus === "won" && gameState === "PLAYING" && (
         <View pointerEvents="none" style={StyleSheet.absoluteFill}>
           <ConfettiCannon count={140} origin={{ x: -20, y: 30 }} explosionSpeed={200} fallSpeed={1200} fadeOut autoStart />
           <ConfettiCannon count={140} origin={{ x: SCREEN_WIDTH + 20, y: 30 }} explosionSpeed={200} fallSpeed={1200} fadeOut autoStart />
@@ -616,7 +635,7 @@ export default function App() {
       </Modal>
 
       {/* Persistent Statistics Modal (Shared for Game Over and Stats Button) */}
-      <Modal transparent visible={isGameOver || isStatsModalVisible} animationType="fade">
+      <Modal transparent visible={isGameOver || isStatsModalVisible || gameState === "STATS"} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             {/* Modal Header */}
@@ -625,7 +644,10 @@ export default function App() {
                 {isStatsModalVisible ? "Statistika" : modalTitle}
               </Text>
               {isStatsModalVisible && (
-                <Pressable onPress={() => setIsStatsModalVisible(false)} style={styles.modalCloseButton}>
+                <Pressable onPress={() => {
+                  setIsStatsModalVisible(false);
+                  setGameState("HOME");
+                }} style={styles.modalCloseButton}>
                   <Ionicons name="close" size={24} color="#A9ABB2" />
                 </Pressable>
               )}
@@ -664,7 +686,10 @@ export default function App() {
                 <Text style={styles.playAgainText}>HILALAO INDRAY</Text>
               </Pressable>
             ) : (
-              <Pressable onPress={() => setIsStatsModalVisible(false)} style={styles.playAgainButton}>
+              <Pressable onPress={() => {
+                setIsStatsModalVisible(false);
+                setGameState("HOME");
+              }} style={styles.playAgainButton}>
                 <Text style={styles.playAgainText}>HIKATONA</Text>
               </Pressable>
             )}

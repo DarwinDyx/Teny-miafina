@@ -25,7 +25,7 @@ export default function MainMenu({ onSelectDifficulty, onOpenStats }) {
         >
           <Ionicons name="leaf-outline" size={24} color={COLORS.green} />
           <View style={styles.diffTextContainer}>
-            <Text style={styles.diffTitle}>Facile / Mora</Text>
+            <Text style={styles.diffTitle}>Tsotra</Text>
             <Text style={styles.diffDescription}>Teny misy litera 4</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={COLORS.mutedText} />
@@ -37,7 +37,7 @@ export default function MainMenu({ onSelectDifficulty, onOpenStats }) {
         >
           <Ionicons name="speedometer-outline" size={24} color={COLORS.yellow} />
           <View style={styles.diffTextContainer}>
-            <Text style={styles.diffTitle}>Moyen / Antonony</Text>
+            <Text style={styles.diffTitle}>Antatany</Text>
             <Text style={styles.diffDescription}>Teny misy litera 5 na 6</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={COLORS.mutedText} />
@@ -49,7 +49,7 @@ export default function MainMenu({ onSelectDifficulty, onOpenStats }) {
         >
           <Ionicons name="flame-outline" size={24} color={COLORS.danger} />
           <View style={styles.diffTextContainer}>
-            <Text style={styles.diffTitle}>Difficile / Sarotra</Text>
+            <Text style={styles.diffTitle}>Sarotra</Text>
             <Text style={styles.diffDescription}>Teny misy litera 7 na mihoatra</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={COLORS.mutedText} />
